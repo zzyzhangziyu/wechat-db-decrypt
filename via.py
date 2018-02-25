@@ -169,7 +169,7 @@ while True:
                 content = f'[音乐] {title} - {des}\n{url}'
             else:
                 content = '[动画表情]'
-        if type_id == 47:
+        elif type_id == 47:
             content = '[动画表情]'
         elif type_id == 3:
             content = '[图片]'
@@ -179,6 +179,10 @@ while True:
             username = dom.documentElement.getAttribute('username')
             alias = dom.documentElement.getAttribute('alias')
             content = f'[名片] {nickname} - {alias if alias else username}'
+        elif type_id == 43:
+            content = '[视频]'
+        elif type_id == 34:
+            content = '[语音]'
         
         content = re.sub('<a.+?>(.+)</a>', r'<\1>', content)
 
