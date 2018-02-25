@@ -81,7 +81,7 @@ cur.execute('''PRAGMA key="x'%s'"''' % chat_msg_passwd)
 cur.execute("PRAGMA cipher_page_size=4096")
 max_seq = -1
 
-from wcwidth import wcswidth
+from wcwidth import wcswidth, wcwidth
 from prettytable import PrettyTable
 
 def padding(s, l):
@@ -92,9 +92,9 @@ def print_recive(talker, content, timestamp):
     table.padding_width = 1
     table.junction_char = '|'
     content = [''] + \
-        ['  ' + wrap(l, 40) for l in content.replace('\t', '    ').split('\n')] +\
+        [wrap(l, 50) for l in content.replace('\t', '    ').split('\n')] +\
         ['', '']
-    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*25, localtime(timestamp)), content)
+    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*20, localtime(timestamp)), content)
     table.align = 'l'
     lines = table.get_string().split('\n')
     lines = [' ' + l for l in lines]
@@ -112,8 +112,8 @@ def print_send(talker, content, timestamp):
     table.padding_width = 1
     table.junction_char = '|'
     width = 30
-    content = ['']+['  ' + wrap(l, 20) for l in content.replace('\t', '    ').split('\n')] + ['','']
-    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*25, localtime(timestamp)), content)
+    content = ['']+[wrap(l, 50) for l in content.replace('\t', '    ').split('\n')] + ['','']
+    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*4, localtime(timestamp)), content)
     table.align = 'l'
     lines = table.get_string().split('\n')
     lines[0] = '/' + lines[0][1:-1] + '\\'
@@ -121,15 +121,30 @@ def print_send(talker, content, timestamp):
     lines.insert(-2, lines[2])
     sign = 'To ' + contect[talker]
     lines[-2] = lines[-2][:-wcswidth(sign)-3] + sign + "  |"
-    lines = [' ' * width + l for l in lines]
+    lines = [' ' * (width + (50-len(lines[0]))) + l for l in lines]
     print('\n'.join(lines))
     print()
 
 from math import ceil
 import re
+import xml.dom.minidom
+from bs4 import BeautifulSoup
 
 def wrap(s, n):
-    return '\n'.join([s[i*n:(i+1)*n] for i in range(ceil(len(s) / n))])
+    result = []
+    buf = ''
+    total_len = 0
+    for c in s:
+        l = wcwidth(c)
+        if (total_len + l > n):
+            result.append(buf)
+            buf = c
+            total_len = 1
+        buf += c
+        total_len += l
+
+    result.append(buf)
+    return '\n'.join(result)
 
 while True:
     seq = cur.execute("select seq from sqlite_sequence where name='ChatCRMsg'").fetchall()
@@ -144,10 +159,26 @@ while True:
 
     msg = cur.execute("select type, CreateTime, IsSender, strTalker, strContent from ChatCRMsg where localId > ?", (max_seq,))
     for type_id, create_time, is_sender, talker, content in msg:
-        if type_id == 47 or type_id == 49:
+        if type_id == 49:
+            dom = BeautifulSoup(content, "html.parser")
+            appname = dom.find('appname').text
+            if (appname == '网易云音乐'):
+                title = dom.find('title').text
+                des = dom.find('des').text
+                url = dom.find('url').text
+                content = f'[音乐] {title} - {des}\n{url}'
+            else:
+                content = '[动画表情]'
+        if type_id == 47:
             content = '[动画表情]'
         elif type_id == 3:
             content = '[图片]'
+        elif type_id == 42:
+            dom = xml.dom.minidom.parseString(content)
+            nickname = dom.documentElement.getAttribute('nickname')
+            username = dom.documentElement.getAttribute('username')
+            alias = dom.documentElement.getAttribute('alias')
+            content = f'[名片] {nickname} - {alias if alias else username}'
         
         content = re.sub('<a.+?>(.+)</a>', r'<\1>', content)
 
