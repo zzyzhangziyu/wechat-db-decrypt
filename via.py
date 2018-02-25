@@ -91,14 +91,18 @@ def print_recive(talker, content, timestamp):
     table = PrettyTable()
     table.padding_width = 1
     table.junction_char = '|'
-    content = ['  ' + wrap(l, 40) for l in content.replace('\t', '    ').split('\n')] + ['']
-    table.add_column(padding('From ' + contect[talker], 40), content)
+    content = [''] + \
+        ['  ' + wrap(l, 40) for l in content.replace('\t', '    ').split('\n')] +\
+        ['', '']
+    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*25, localtime(timestamp)), content)
     table.align = 'l'
     lines = table.get_string().split('\n')
     lines = [' ' + l for l in lines]
     lines[0] = ' /' + lines[0][2:-1] + '\\'
-    lines[1] = lines[1][:-21] + strftime("%Y-%m-%d %H:%M:%S", localtime(timestamp)) + ' |'
     lines[-1] = '/-' + lines[0][2:-1] + '/'
+    lines.insert(-2, lines[2])
+    sign = 'From ' + contect[talker]
+    lines[-2] = lines[-2][:-wcswidth(sign)-3] + sign + "  |"
     print('\n'.join(lines))
     print()
 
@@ -108,13 +112,15 @@ def print_send(talker, content, timestamp):
     table.padding_width = 1
     table.junction_char = '|'
     width = 30
-    content = ['  ' + wrap(l, 20) for l in content.replace('\t', '    ').split('\n')] + ['']
-    table.add_column(padding('To ' + contect[talker], 40), content)
+    content = ['']+['  ' + wrap(l, 20) for l in content.replace('\t', '    ').split('\n')] + ['','']
+    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*25, localtime(timestamp)), content)
     table.align = 'l'
     lines = table.get_string().split('\n')
     lines[0] = '/' + lines[0][1:-1] + '\\'
-    lines[1] = lines[1][:-21] + strftime("%Y-%m-%d %H:%M:%S", localtime(timestamp)) + ' |'
     lines[-1] = '\\' + lines[0][1:-1] + '-\\'
+    lines.insert(-2, lines[2])
+    sign = 'To ' + contect[talker]
+    lines[-2] = lines[-2][:-wcswidth(sign)-3] + sign + "  |"
     lines = [' ' * width + l for l in lines]
     print('\n'.join(lines))
     print()
