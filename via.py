@@ -14,7 +14,7 @@ import os
 from winreg import *
 import hashlib
 import binascii
-from time import sleep
+from time import sleep, localtime, strftime
 from pysqlcipher3 import dbapi2 as sqlite
 
 ReadProcessMemory = windll.kernel32.ReadProcessMemory
@@ -87,29 +87,43 @@ from prettytable import PrettyTable
 def padding(s, l):
     return s + ' ' * (l - wcswidth(s))
 
-def print_recive(talker, content):
+def print_recive(talker, content, timestamp):
     table = PrettyTable()
     table.padding_width = 1
-    content = ['  ' + l for l in content.split('\n')] + ['']
-    table.add_column(padding(contect[talker], 40), content)
+    table.junction_char = '|'
+    content = ['  ' + wrap(l, 40) for l in content.replace('\t', '    ').split('\n')] + ['']
+    table.add_column(padding('From ' + contect[talker], 40), content)
     table.align = 'l'
     lines = table.get_string().split('\n')
-    lines = lines[:-1]
+    lines = [' ' + l for l in lines]
+    lines[0] = ' /' + lines[0][2:-1] + '\\'
+    lines[1] = lines[1][:-21] + strftime("%Y-%m-%d %H:%M:%S", localtime(timestamp)) + ' |'
+    lines[-1] = '/-' + lines[0][2:-1] + '/'
     print('\n'.join(lines))
     print()
 
 
-def print_send(talker, content):
+def print_send(talker, content, timestamp):
     table = PrettyTable()
     table.padding_width = 1
-    content = ['  ' + l for l in content.split('\n')] + ['']
-    table.add_column(padding(contect[talker], 40), content)
+    table.junction_char = '|'
+    width = 30
+    content = ['  ' + wrap(l, 20) for l in content.replace('\t', '    ').split('\n')] + ['']
+    table.add_column(padding('To ' + contect[talker], 40), content)
     table.align = 'l'
     lines = table.get_string().split('\n')
-    lines = ['         ' + l for l in lines]
-    lines = lines[:-1]
+    lines[0] = '/' + lines[0][1:-1] + '\\'
+    lines[1] = lines[1][:-21] + strftime("%Y-%m-%d %H:%M:%S", localtime(timestamp)) + ' |'
+    lines[-1] = '\\' + lines[0][1:-1] + '-\\'
+    lines = [' ' * width + l for l in lines]
     print('\n'.join(lines))
     print()
+
+from math import ceil
+import re
+
+def wrap(s, n):
+    return '\n'.join([s[i*n:(i+1)*n] for i in range(ceil(len(s) / n))])
 
 while True:
     seq = cur.execute("select seq from sqlite_sequence where name='ChatCRMsg'").fetchall()
@@ -122,11 +136,18 @@ while True:
         sleep(1)
         continue
 
-    msg = cur.execute("select IsSender, strTalker, strContent from ChatCRMsg where localId > ?", (max_seq,))
-    for is_sender, talker, content in msg:
+    msg = cur.execute("select type, CreateTime, IsSender, strTalker, strContent from ChatCRMsg where localId > ?", (max_seq,))
+    for type_id, create_time, is_sender, talker, content in msg:
+        if type_id == 47 or type_id == 49:
+            content = '[动画表情]'
+        elif type_id == 3:
+            content = '[图片]'
+        
+        content = re.sub('<a.+?>(.+)</a>', r'<\1>', content)
+
         if (is_sender):
-            print_send(talker, content)
+            print_send(talker, content, create_time)
         else:
-            print_recive(talker, content)
+            print_recive(talker, content, create_time)
 
     max_seq = seq
