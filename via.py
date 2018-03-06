@@ -83,20 +83,16 @@ max_seq = -1
 
 from wcwidth import wcswidth, wcwidth
 from prettytable import PrettyTable
+from tabulate import tabulate
 
 def padding(s, l):
     return s + ' ' * (l - wcswidth(s))
 
 def print_recive(talker, content, timestamp):
-    table = PrettyTable()
-    table.padding_width = 1
-    table.junction_char = '|'
     content = [''] + \
-        [wrap(l, 50) for l in content.replace('\t', '    ').split('\n')] +\
+        [[l] for l in content] +\
         ['', '']
-    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*20, localtime(timestamp)), content)
-    table.align = 'l'
-    lines = table.get_string().split('\n')
+    lines = tabulate(content, [strftime("%Y-%m-%d %H:%M:%S"+' '*20, localtime(timestamp))], tablefmt='psql').split('\n')
     lines = [' ' + l for l in lines]
     lines[0] = ' /' + lines[0][2:-1] + '\\'
     lines[-1] = '/-' + lines[0][2:-1] + '/'
@@ -108,14 +104,11 @@ def print_recive(talker, content, timestamp):
 
 
 def print_send(talker, content, timestamp):
-    table = PrettyTable()
-    table.padding_width = 1
-    table.junction_char = '|'
+    content = [''] + \
+        [[l] for l in content] +\
+        ['', '']
+    lines = tabulate(content, [strftime("%Y-%m-%d %H:%M:%S"+' '*20, localtime(timestamp))], tablefmt='psql').split('\n')
     width = 30
-    content = ['']+[wrap(l, 50) for l in content.replace('\t', '    ').split('\n')] + ['','']
-    table.add_column(strftime("%Y-%m-%d %H:%M:%S"+' '*4, localtime(timestamp)), content)
-    table.align = 'l'
-    lines = table.get_string().split('\n')
     lines[0] = '/' + lines[0][1:-1] + '\\'
     lines[-1] = '\\' + lines[0][1:-1] + '-\\'
     lines.insert(-2, lines[2])
@@ -131,20 +124,25 @@ import xml.dom.minidom
 from bs4 import BeautifulSoup
 
 def wrap(s, n):
-    result = []
-    buf = ''
-    total_len = 0
-    for c in s:
-        l = wcwidth(c)
-        if (total_len + l > n):
-            result.append(buf)
-            buf = c
-            total_len = 1
-        buf += c
-        total_len += l
+    def _wrap(s, n):
+        result = []
+        buf = ''
+        total_len = 0
+        for c in s:
+            l = wcwidth(c)
+            if (total_len + l > n):
+                result.append(buf)
+                buf = c
+                total_len = 1
+            buf += c
+            total_len += l
 
-    result.append(buf)
-    return '\n'.join(result)
+        result.append(buf)
+        return result
+    result = []
+    for l in s.split('\n'):
+        result += _wrap(l, n)
+    return result
 
 while True:
     seq = cur.execute("select seq from sqlite_sequence where name='ChatCRMsg'").fetchall()
@@ -167,6 +165,12 @@ while True:
                 des = dom.find('des').text
                 url = dom.find('url').text
                 content = f'[音乐] {title} - {des}\n{url}'
+            if appname == '微信支付':
+                display_name = dom.find('display_name').text
+                words = dom.select('value word')
+                money = '支付金额' + words[0].text
+                explains = '\n'.join(['  * ' + w.text for w in words[1:]])
+                content = f'[微信支付凭证] {display_name}\n\n {money}\n\n{explains}'
             else:
                 content = '[动画表情]'
         elif type_id == 47:
@@ -185,6 +189,8 @@ while True:
             content = '[语音]'
         
         content = re.sub('<a.+?>(.+)</a>', r'<\1>', content)
+
+        content = wrap(content, 50)
 
         if (is_sender):
             print_send(talker, content, create_time)
